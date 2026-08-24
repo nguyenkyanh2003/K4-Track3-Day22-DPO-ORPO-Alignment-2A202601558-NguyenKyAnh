@@ -44,18 +44,20 @@ def main():
 
     from peft import PeftModel
     from unsloth import FastLanguageModel
+    from unsloth.chat_templates import get_chat_template
     import gc
     import torch
 
-    # Step 1: load + stack SFT then DPO
+    # Step 1: load the self-contained SFT+DPO adapter produced by NB3.
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=base, max_seq_length=max_len, dtype=None, load_in_4bit=True,
     )
+    tokenizer = get_chat_template(tokenizer, chat_template="qwen-2.5")
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    model = PeftModel.from_pretrained(model, args.sft_path)
-    print("Loaded SFT-mini adapter")
+    model = PeftModel.from_pretrained(model, args.dpo_path)
+    print("Loaded combined SFT+DPO adapter")
 
     # Step 2: save merged FP16
     model.save_pretrained_merged(
@@ -72,6 +74,7 @@ def main():
         model_name=args.merged_output,
         max_seq_length=max_len, dtype=None, load_in_4bit=False,
     )
+    tokenizer = get_chat_template(tokenizer, chat_template="qwen-2.5")
 
     for q in quants:
         print(f"Quantizing to GGUF {q}...")

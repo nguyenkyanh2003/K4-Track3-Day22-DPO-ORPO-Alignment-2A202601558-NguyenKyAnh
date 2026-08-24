@@ -77,47 +77,33 @@ assert torch.cuda.is_available(), "DPO needs a CUDA GPU. See HARDWARE-GUIDE.md."
 
 # %%
 from unsloth import FastLanguageModel
+from unsloth.chat_templates import get_chat_template
 from peft import PeftModel
 
-# Policy — gets new DPO LoRA adapter on top of SFT LoRA
+# Load the SFT adapter twice on one shared 4-bit base: the default adapter is
+# trainable (policy), while the named reference adapter stays frozen.
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name=BASE_MODEL,
     max_seq_length=MAX_LEN,
     dtype=None,
     load_in_4bit=True,
 )
+tokenizer = get_chat_template(tokenizer, chat_template="qwen-2.5")
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
-# Load SFT adapter on top of base
-model = PeftModel.from_pretrained(model, str(SFT_PATH), is_trainable=True)
-print(f"Policy: {model.__class__.__name__} with SFT adapter loaded")
-
-# %%
-# Wrap policy with NEW LoRA adapter for DPO updates (don't merge SFT — keep stacked)
-# Unsloth re-applies LoRA on top of the existing PeftModel.
-model = FastLanguageModel.get_peft_model(
-    model,
-    r=16,
-    lora_alpha=32,
-    lora_dropout=0.0,
-    bias="none",
-    target_modules=[
-        "q_proj", "k_proj", "v_proj", "o_proj",
-        "gate_proj", "up_proj", "down_proj",
-    ],
-    use_gradient_checkpointing="unsloth",
-    random_state=42,
-    use_rslora=False,
-    loftq_config=None,
+model = PeftModel.from_pretrained(
+    model, str(SFT_PATH), adapter_name="default", is_trainable=True
 )
-print(f"Trainable params (DPO LoRA): {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
+model.load_adapter(str(SFT_PATH), adapter_name="reference", is_trainable=False)
+model.set_adapter("default")
+print("Policy adapter: default (trainable); reference adapter: reference (frozen)")
+print(f"Trainable params: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
 # %% [markdown]
-# > **Why no separate `ref_model=` argument?** Modern TRL (≥ 0.12) auto-detects
-# > PEFT models and uses the *base model without the adapter* as the reference.
-# > That's the same memory layout: 1 base + 2 adapter sets in VRAM. No deepcopy
-# > needed.
+# > **Why no separate `ref_model=` argument?** TRL switches between the trainable
+# > `default` adapter and frozen `reference` adapter on the same 4-bit base. This
+# > keeps the correct SFT reference policy without duplicating base weights.
 
 # %% [markdown]
 # ## 2. Build DPOConfig (deck §5.2 hyperparameters)
@@ -143,6 +129,8 @@ dpo_config = DPOConfig(
     fp16=not torch.cuda.is_bf16_supported(),
     seed=42,
     loss_type="sigmoid",         # DPO standard (alternatives: ipo, hinge, kto)
+    model_adapter_name="default",
+    ref_adapter_name="reference",
     report_to="none",
 )
 
@@ -193,7 +181,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 logs = pd.DataFrame(trainer.state.log_history)
-logs = logs[logs["loss"].notna() if "loss" in logs.columns else logs.index].copy()
+if "loss" in logs.columns:
+    logs = logs[logs["loss"].notna()].copy()
 
 # TRL DPO logs include rewards/chosen, rewards/rejected, rewards/margins, kl
 chosen_col = "rewards/chosen" if "rewards/chosen" in logs.columns else None
@@ -237,7 +226,8 @@ plt.show()
 # Read this cell carefully — it tells you which kind of "reward gap up" you got.
 
 # %%
-if chosen_col and rejected_col and len(logs) >= 5:
+last_chosen = last_rejected = last_gap = None
+if chosen_col and rejected_col and len(logs) >= 1:
     last_chosen = logs[chosen_col].iloc[-5:].mean()
     last_rejected = logs[rejected_col].iloc[-5:].mean()
     last_gap = last_chosen - last_rejected
@@ -268,7 +258,7 @@ if chosen_col and rejected_col and len(logs) >= 5:
 # ## 6. Save adapter
 
 # %%
-trainer.model.save_pretrained(str(DPO_OUT))
+trainer.model.save_pretrained(str(DPO_OUT), selected_adapters=["default"])
 tokenizer.save_pretrained(str(DPO_OUT))
 print(f"Saved DPO adapter to {DPO_OUT}")
 
@@ -282,9 +272,9 @@ metrics = {
     "lr": LR,
     "epochs": EPOCHS,
     "final_train_loss": float(train_result.training_loss),
-    "end_chosen_reward": float(last_chosen) if chosen_col else None,
-    "end_rejected_reward": float(last_rejected) if rejected_col else None,
-    "end_reward_gap": float(last_gap) if chosen_col and rejected_col else None,
+    "end_chosen_reward": float(last_chosen) if last_chosen is not None else None,
+    "end_rejected_reward": float(last_rejected) if last_rejected is not None else None,
+    "end_reward_gap": float(last_gap) if last_gap is not None else None,
 }
 (DPO_OUT / "dpo_metrics.json").write_text(json.dumps(metrics, indent=2))
 print(f"Wrote metrics to {DPO_OUT / 'dpo_metrics.json'}")

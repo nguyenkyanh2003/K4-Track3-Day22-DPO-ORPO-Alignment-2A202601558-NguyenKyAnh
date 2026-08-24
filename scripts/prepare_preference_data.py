@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 from datasets import load_dataset
 from transformers import AutoTokenizer
+from unsloth.chat_templates import get_chat_template
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -49,6 +50,7 @@ def main():
 
     print(f"Loading tokenizer from {args.tokenizer}...")
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+    tokenizer = get_chat_template(tokenizer, chat_template="qwen-2.5")
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 

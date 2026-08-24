@@ -27,6 +27,7 @@ llama-cpp-python>=0.3,<1.0
 # lm-eval-harness — field-standard scorer for IFEval, GSM8K, MMLU.
 # Extras: ifeval (langdetect), math (sympy for LaTeX matching).
 lm-eval[ifeval,math]>=0.4.5,<1.0
+antlr4-python3-runtime==4.9.3          # omegaconf compatibility on Colab
 
 # ── Notebook ──────────────────────────────────────────────────
 jupyterlab>=4.3,<5.0

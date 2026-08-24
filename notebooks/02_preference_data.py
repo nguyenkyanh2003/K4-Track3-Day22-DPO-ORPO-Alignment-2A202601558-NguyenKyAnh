@@ -29,7 +29,7 @@ from pathlib import Path
 COMPUTE_TIER = os.environ.get("COMPUTE_TIER", "T4").upper()
 
 if COMPUTE_TIER == "T4":
-    PREF_SLICE = 1000
+    PREF_SLICE = 2000
     MAX_LEN = 512
     MAX_PROMPT_LEN = 256
 else:
@@ -57,9 +57,11 @@ print(f"output:          {PREF_OUT}")
 
 # %%
 from transformers import AutoTokenizer
+from unsloth.chat_templates import get_chat_template
 
 assert ADAPTER_DIR.exists(), f"NB1 must run first — {ADAPTER_DIR} missing"
 tokenizer = AutoTokenizer.from_pretrained(ADAPTER_DIR)
+tokenizer = get_chat_template(tokenizer, chat_template="qwen-2.5")
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 print(f"Tokenizer: {tokenizer.__class__.__name__}  vocab={tokenizer.vocab_size:,}")

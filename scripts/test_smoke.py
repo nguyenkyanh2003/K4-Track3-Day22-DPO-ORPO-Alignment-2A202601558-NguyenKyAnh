@@ -35,7 +35,31 @@ def test_scripts_parse():
 
 def test_colab_notebooks_are_valid_json():
     for p in (REPO / "colab").glob("*.ipynb"):
-        json.loads(p.read_text(encoding="utf-8"))  # ValueError if corrupt
+        notebook = json.loads(p.read_text(encoding="utf-8"))  # ValueError if corrupt
+        for index, cell in enumerate(notebook["cells"]):
+            if cell["cell_type"] != "code":
+                continue
+            source = "".join(cell.get("source", []))
+            # IPython shell/magic cells are valid in Colab but not Python AST.
+            if any(line.lstrip().startswith(("!", "%")) for line in source.splitlines()):
+                continue
+            ast.parse(source, filename=f"{p.name}:cell-{index}")
+
+
+def test_colab_contains_reviewed_runtime_fixes():
+    required = [
+        "bkai-foundation-models/vi-alpaca",
+        'get_chat_template(tokenizer, chat_template="qwen-2.5")',
+        'model_adapter_name="default"',
+        'ref_adapter_name="reference"',
+        "Loaded combined SFT+DPO adapter",
+        "lab22-results.zip",
+    ]
+    for p in (REPO / "colab").glob("*.ipynb"):
+        notebook = json.loads(p.read_text(encoding="utf-8"))
+        source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+        missing = [marker for marker in required if marker not in source]
+        assert not missing, f"{p.name} is stale; missing {missing}. Rebuild it."
 
 
 def test_trainer_uses_processing_class_not_tokenizer():

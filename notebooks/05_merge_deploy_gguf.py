@@ -57,6 +57,7 @@ assert torch.cuda.is_available()
 
 # %%
 from unsloth import FastLanguageModel
+from unsloth.chat_templates import get_chat_template
 from peft import PeftModel
 
 model, tokenizer = FastLanguageModel.from_pretrained(
@@ -65,18 +66,17 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     dtype=None,
     load_in_4bit=True,
 )
+tokenizer = get_chat_template(tokenizer, chat_template="qwen-2.5")
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
-# Stack SFT-mini → DPO adapters
-SFT_PATH = REPO_ROOT / "adapters" / "sft-mini"
-model = PeftModel.from_pretrained(model, str(SFT_PATH))
-print(f"Loaded SFT-mini adapter from {SFT_PATH}")
+# NB3 saves a self-contained adapter initialized from SFT and updated by DPO.
+model = PeftModel.from_pretrained(model, str(DPO_PATH))
+print(f"Loaded combined SFT+DPO adapter from {DPO_PATH}")
 
 # %% [markdown]
-# > **Note:** The DPO adapter trained in NB3 stacks on top of SFT. To get a fully
-# > aligned merged model, we apply both adapters before merging. Unsloth's
-# > `save_pretrained_merged` handles the SFT + DPO + base merge in one shot.
+# > **Note:** The adapter saved by NB3 already contains the SFT initialization
+# > plus the DPO updates. Loading that one adapter is sufficient for merging.
 
 # %% [markdown]
 # ## 2. Save merged FP16 weights
@@ -119,6 +119,7 @@ model, tokenizer = FLM.from_pretrained(
     dtype=None,
     load_in_4bit=False,    # already merged; load full precision
 )
+tokenizer = get_chat_template(tokenizer, chat_template="qwen-2.5")
 
 # %%
 # Save GGUF in 1 quantization tier (Q4_K_M). Add more tiers below if you want the
