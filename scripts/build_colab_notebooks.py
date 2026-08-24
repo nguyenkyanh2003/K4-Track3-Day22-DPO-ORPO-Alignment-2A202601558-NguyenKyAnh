@@ -15,11 +15,13 @@ from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parent.parent
-SOURCES = [
+CORE_SOURCES = [
     REPO / "notebooks" / "01_sft_mini.py",
     REPO / "notebooks" / "02_preference_data.py",
     REPO / "notebooks" / "03_dpo_train.py",
     REPO / "notebooks" / "04_compare_and_eval.py",
+]
+OPTIONAL_SOURCES = [
     REPO / "notebooks" / "05_merge_deploy_gguf.py",
     REPO / "notebooks" / "06_benchmark.py",
 ]
@@ -75,15 +77,21 @@ def parse_percent(path: Path) -> list[dict]:
     return cells
 
 
-def setup_cells(tier: str) -> list[dict]:
+def setup_cells(tier: str, *, core_only: bool = False) -> list[dict]:
     model = "Qwen2.5-3B" if tier == "T4" else "Qwen2.5-7B"
+    scope = "CORE NB1-NB4" if core_only else "NB1-NB6"
+    pipeline = (
+        "SFT → preference data → DPO → evaluation → verify → ZIP"
+        if core_only
+        else "SFT → preference data → DPO → evaluation → GGUF → benchmark"
+    )
     return [
         cell(
             "markdown",
             f"# Lab 22 — DPO/ORPO Alignment ({tier} tier)\n\n"
-            f"One-click pipeline: SFT → preference data → DPO → evaluation → GGUF → benchmark.\n\n"
+            f"One-click pipeline: {pipeline}.\n\n"
             "**Sinh viên:** Nguyễn Kỳ Anh · **MSSV:** 2A202601558\n\n"
-            f"**Tier:** {tier} · **Model:** {model} · generated from the reviewed Jupytext sources.\n",
+            f"**Tier:** {tier} · **Model:** {model} · **Run-all scope:** {scope}.\n",
         ),
         cell("markdown", "## A. Clean Colab setup\n"),
         cell(
@@ -96,15 +104,25 @@ def setup_cells(tier: str) -> list[dict]:
         ),
         cell(
             "code",
-            "# Install one mutually compatible stack. The final pin fixes the Colab\n"
-            "# omegaconf/antlr resolver conflict seen with lm-eval.\n"
-            "!pip install -q \\\n"
-            "  \"unsloth>=2025.10,<2026.5\" \"trl>=0.12,<0.20\" \"peft>=0.13,<1.0\" \\\n"
-            "  \"bitsandbytes>=0.44,<1.0\" \"datasets>=3.1,<4.0\" \"accelerate>=1.1,<2.0\" \\\n"
-            "  \"llama-cpp-python>=0.3,<1.0\" \"lm-eval[ifeval,math]>=0.4.5,<1.0\" \\\n"
-            "  \"matplotlib>=3.9,<4.0\" \"pandas>=2.2,<3.0\" \"pyarrow>=17,<22\" \\\n"
-            "  \"openai>=1.55,<2.0\" \"anthropic>=0.40,<1.0\"\n"
-            "!pip install -q --force-reinstall \"antlr4-python3-runtime==4.9.3\"\n",
+            "# Clean, mutually compatible Colab stack. transformers 5.x breaks\n"
+            "# Unsloth merged export; pin 4.57.6 before anything imports it.\n"
+            "# Gradio is unused here and conflicts with the transformers 4.x hub pin.\n"
+            "!pip uninstall -y -q gradio gradio_client 2>/dev/null || true\n"
+            "!pip install -q --upgrade-strategy only-if-needed \\\n"
+            "  \"unsloth==2026.4.4\" \"transformers==4.57.6\" \"trl==0.19.1\" \\\n"
+            "  \"peft>=0.18,<1.0\" \"bitsandbytes>=0.45.5,<1.0\" \\\n"
+            "  \"datasets>=3.4.1,<4.0\" \"accelerate>=1.1,<2.0\" \\\n"
+            "  \"matplotlib>=3.9,<4.0\" \"pandas>=2.2,<3.0\" \"pyarrow>=17,<22\"\n",
+        ),
+        cell(
+            "code",
+            "# Fail fast before training if Colab ever changes its base image.\n"
+            "import transformers, trl, peft\n"
+            "print('transformers:', transformers.__version__)\n"
+            "print('trl:', trl.__version__)\n"
+            "print('peft:', peft.__version__)\n"
+            "assert transformers.__version__ == '4.57.6', transformers.__version__\n"
+            "assert trl.__version__ == '0.19.1', trl.__version__\n",
         ),
         cell(
             "code",
@@ -115,16 +133,19 @@ def setup_cells(tier: str) -> list[dict]:
         ),
         cell(
             "code",
-            "# Work inside a clean clone so outputs follow the submission layout.\n"
-            "import os, subprocess\n"
+            "# Re-clone on every Run-all so an older failed run cannot leak stale\n"
+            "# artifacts into the new submission.\n"
+            "import os, shutil, subprocess\n"
             "from pathlib import Path\n"
             "REPO_URL = os.environ.get(\n"
             "    'LAB_REPO_URL',\n"
             "    'https://github.com/nguyenkyanh2003/K4-Track3-Day22-DPO-ORPO-Alignment-2A202601558-NguyenKyAnh.git',\n"
             ")\n"
-            "WORK = Path('/content/lab22-run')\n"
-            "if not (WORK / '.git').exists():\n"
-            "    subprocess.run(['git', 'clone', '--depth', '1', REPO_URL, str(WORK)], check=True)\n"
+            "WORK = Path('/content/lab22-run-fixed')\n"
+            "os.chdir('/content')\n"
+            "if WORK.exists():\n"
+            "    shutil.rmtree(WORK)\n"
+            "subprocess.run(['git', 'clone', '--depth', '1', REPO_URL, str(WORK)], check=True)\n"
             "os.chdir(WORK)\n"
             "print('Working directory:', Path.cwd())\n",
         ),
@@ -137,7 +158,7 @@ def final_cells() -> list[dict]:
         cell(
             "code",
             "from pathlib import Path\n"
-            "import zipfile\n"
+            "import subprocess, sys, zipfile\n"
             "root = Path.cwd()\n"
             "expected = [\n"
             "    root/'adapters/sft-mini/adapter_config.json',\n"
@@ -160,14 +181,26 @@ def final_cells() -> list[dict]:
             "              root/'adapters/dpo/adapter_config.json',\n"
             "              root/'adapters/dpo/dpo_metrics.json']:\n"
             "        if p.exists(): zf.write(p, p.relative_to(root))\n"
-            "print('Results bundle:', bundle, f'({bundle.stat().st_size/1024**2:.1f} MiB)')\n",
+            "print('Results bundle:', bundle, f'({bundle.stat().st_size/1024**2:.1f} MiB)')\n"
+            "verify = subprocess.run([sys.executable, 'scripts/verify.py'], text=True, capture_output=True)\n"
+            "print('\\nVERIFY OUTPUT\\n' + verify.stdout)\n"
+            "if verify.stderr: print(verify.stderr)\n"
+            "assert verify.returncode == 0, 'Submission verification failed; inspect VERIFY OUTPUT above.'\n"
+            "print('READY TO SUBMIT:', bundle)\n",
+        ),
+        cell(
+            "code",
+            "# Colab starts the browser download after a successful verified run.\n"
+            "from google.colab import files\n"
+            "files.download('/content/lab22-results.zip')\n",
         ),
     ]
 
 
-def build(tier: str) -> dict:
-    cells = setup_cells(tier)
-    for source in SOURCES:
+def build(tier: str, *, core_only: bool = False) -> dict:
+    cells = setup_cells(tier, core_only=core_only)
+    sources = CORE_SOURCES if core_only else CORE_SOURCES + OPTIONAL_SOURCES
+    for source in sources:
         cells.extend(parse_percent(source))
     cells.extend(final_cells())
     return {
@@ -185,11 +218,15 @@ def build(tier: str) -> dict:
 
 def main() -> None:
     targets = {
-        "T4": REPO / "colab" / "Lab22_DPO_T4.ipynb",
-        "BIGGPU": REPO / "colab" / "Lab22_DPO_BigGPU.ipynb",
+        ("T4", False): REPO / "colab" / "Lab22_DPO_T4.ipynb",
+        ("T4", True): REPO / "colab" / "Lab22_DPO_T4_SAFE.ipynb",
+        ("BIGGPU", False): REPO / "colab" / "Lab22_DPO_BigGPU.ipynb",
     }
-    for tier, target in targets.items():
-        target.write_text(json.dumps(build(tier), ensure_ascii=False, indent=1), encoding="utf-8")
+    for (tier, core_only), target in targets.items():
+        target.write_text(
+            json.dumps(build(tier, core_only=core_only), ensure_ascii=False, indent=1),
+            encoding="utf-8",
+        )
         print(f"Wrote {target.relative_to(REPO)}")
 
 

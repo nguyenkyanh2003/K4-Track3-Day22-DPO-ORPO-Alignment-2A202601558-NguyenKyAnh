@@ -22,11 +22,15 @@ Build SFT-mini checkpoint → train DPO adapter → compare SFT-only vs SFT+DPO 
 
 ## Quick Start — T4 (recommended)
 
-**Option 1: Free Colab (zero install)**
+**Option 1: Free Colab — deadline-safe core (recommended)**
 
-[![Open T4 in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/<your-username>/Day22-Track3-DPO-Alignment-Lab/blob/main/colab/Lab22_DPO_T4.ipynb)
+[![Open safe T4 core in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/nguyenkyanh2003/K4-Track3-Day22-DPO-ORPO-Alignment-2A202601558-NguyenKyAnh/blob/main/colab/Lab22_DPO_T4_SAFE.ipynb)
 
-Click → Runtime → Change runtime type → **T4 GPU** → Run all.
+Click → Runtime → Change runtime type → **T4 GPU** → Run all. This notebook runs
+NB1–NB4, verifies the artifacts, creates `/content/lab22-results.zip`, and starts
+the download. It intentionally excludes the fragile optional GGUF/benchmark cells.
+
+Full optional NB5/NB6 notebook: [`colab/Lab22_DPO_T4.ipynb`](colab/Lab22_DPO_T4.ipynb).
 
 **Option 2: Local laptop (≥ 12 GB VRAM)**
 
@@ -39,7 +43,7 @@ make pipeline           # CORE: sft → data → dpo → eval (NB1-4, ~30 min)
 make verify             # pre-submission gatekeeper
 ```
 
-Yêu cầu: **Python 3.10–3.12**, NVIDIA GPU ≥ 12 GB VRAM (3060/4060 trở lên), CUDA 11.8 hoặc 12.1+.
+Yêu cầu: **Python 3.10–3.13**, NVIDIA GPU ≥ 12 GB VRAM (3060/4060 trở lên), CUDA 11.8 hoặc 12.1+.
 
 ### Tất cả lệnh `make`
 
@@ -200,6 +204,7 @@ Full provocations: [`BONUS-CHALLENGE.md`](BONUS-CHALLENGE.md) (tiếng Việt) �
 │   └── 06_benchmark.py             # IFEval/GSM8K/MMLU/AlpacaEval-lite + 4-bar plot
 ├── colab/                          # Colab-launchable .ipynb mirrors
 │   ├── Lab22_DPO_T4.ipynb
+│   ├── Lab22_DPO_T4_SAFE.ipynb     # NB1-NB4 Run-all, verify + ZIP download
 │   └── Lab22_DPO_BigGPU.ipynb
 ├── scripts/
 │   ├── prepare_preference_data.py  # CLI wrapper for NB2 logic

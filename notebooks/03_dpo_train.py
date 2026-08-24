@@ -285,6 +285,16 @@ metrics = {
 (DPO_OUT / "dpo_metrics.json").write_text(json.dumps(metrics, indent=2))
 print(f"Wrote metrics to {DPO_OUT / 'dpo_metrics.json'}")
 
+# NB4 reloads each adapter independently. Drop both DPO models here so Run-all
+# has a predictable amount of free VRAM for evaluation and optional export.
+import gc
+
+for _name in ("trainer", "model", "ref_model", "ref_base", "pref_ds", "train_result", "tokenizer"):
+    globals().pop(_name, None)
+gc.collect()
+torch.cuda.empty_cache()
+print("Released NB3 policy/reference models.")
+
 # %% [markdown]
 # ## 7. Vibe-coding callout
 #

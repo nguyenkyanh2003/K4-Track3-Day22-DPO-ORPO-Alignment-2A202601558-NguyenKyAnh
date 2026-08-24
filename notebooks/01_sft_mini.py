@@ -218,6 +218,16 @@ generated = tokenizer.decode(out[0][inputs.shape[1]:], skip_special_tokens=True)
 print(f"PROMPT: {prompt}\n")
 print(f"SFT-mini response:\n{generated}")
 
+# Run-all continues into DPO, which loads policy + reference models. Release the
+# SFT trainer now so three 3B models are never resident on the T4 together.
+import gc
+
+for _name in ("trainer", "model", "tokenizer", "train_result", "ds", "ds_formatted", "inputs", "out"):
+    globals().pop(_name, None)
+gc.collect()
+torch.cuda.empty_cache()
+print("Released NB1 GPU memory for NB3.")
+
 # %% [markdown]
 # ## 5. Vibe-coding callout
 #

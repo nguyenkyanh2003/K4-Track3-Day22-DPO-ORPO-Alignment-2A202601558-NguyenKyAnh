@@ -24,7 +24,13 @@
 # %%
 import os
 import json
+import gc
 from pathlib import Path
+
+# Run-all safety: remove any large model/trainer references left by prior cells.
+for _name in ("trainer", "model", "ref_model", "ref_base", "train_result", "pref_ds", "llm"):
+    globals().pop(_name, None)
+gc.collect()
 
 COMPUTE_TIER = os.environ.get("COMPUTE_TIER", "T4").upper()
 BASE_MODEL = (
@@ -51,6 +57,7 @@ print(f"GGUF output:     {GGUF_DIR}")
 import torch
 
 assert torch.cuda.is_available()
+torch.cuda.empty_cache()
 
 # %% [markdown]
 # ## 1. Load DPO model + merge adapter
@@ -92,12 +99,11 @@ model.save_pretrained_merged(
     str(MERGED_PATH),
     tokenizer,
     save_method="merged_16bit",
+    maximum_memory_usage=0.60,
 )
 print(f"Saved merged FP16 to {MERGED_PATH}")
 
 # Free GPU memory before GGUF conversion (which spawns a subprocess that needs RAM)
-import gc
-
 del model
 gc.collect()
 torch.cuda.empty_cache()
@@ -158,6 +164,17 @@ torch.cuda.empty_cache()
 # ## 4. Smoke test with llama-cpp-python
 
 # %%
+import importlib.util
+import subprocess
+import sys
+
+if importlib.util.find_spec("llama_cpp") is None:
+    print("Installing optional llama-cpp-python smoke-test dependency...")
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-q", "llama-cpp-python>=0.3,<1.0"],
+        check=True,
+    )
+
 from llama_cpp import Llama
 
 # Find the Q4_K_M GGUF

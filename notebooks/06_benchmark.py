@@ -29,7 +29,20 @@
 import os
 import json
 import gc
+import importlib.util
+import subprocess
+import sys
 from pathlib import Path
+
+if importlib.util.find_spec("lm_eval") is None:
+    print("Installing optional lm-eval benchmark dependency...")
+    subprocess.run(
+        [
+            sys.executable, "-m", "pip", "install", "-q",
+            "lm-eval[ifeval,math]>=0.4.5,<1.0", "antlr4-python3-runtime==4.9.3",
+        ],
+        check=True,
+    )
 
 COMPUTE_TIER = os.environ.get("COMPUTE_TIER", "T4").upper()
 

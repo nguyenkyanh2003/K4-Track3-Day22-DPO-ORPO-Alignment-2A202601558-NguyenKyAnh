@@ -5,13 +5,13 @@
 # ── Core training stack ───────────────────────────────────────
 # Unsloth bundles patched transformers + bitsandbytes + xformers — its version
 # pin is what locks the Unsloth + TRL compatibility matrix. Bump together.
-unsloth>=2025.10,<2026.5                # patched kernels for 7B-on-T4
-transformers>=4.46,<5.0
-trl>=0.12,<0.20                         # DPOTrainer + DPOConfig surface
-peft>=0.13,<1.0
+unsloth==2026.4.4                       # tested Colab release
+transformers==4.57.6                    # 5.x breaks Unsloth merged export
+trl==0.19.1                             # tested DPOTrainer + DPOConfig surface
+peft>=0.18,<1.0
 accelerate>=1.1,<2.0
-bitsandbytes>=0.44,<1.0                 # NF4 + 8-bit optim
-datasets>=3.1,<4.0
+bitsandbytes>=0.45.5,<1.0               # NF4 + 8-bit optim
+datasets>=3.4.1,<4.0
 
 # ── Plotting + reporting ──────────────────────────────────────
 matplotlib>=3.9,<4.0
