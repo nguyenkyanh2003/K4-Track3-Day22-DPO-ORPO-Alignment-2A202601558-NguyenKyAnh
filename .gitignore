@@ -23,6 +23,7 @@ gguf/
 *.gguf
 runs/
 wandb/
+lab22-*.zip
 
 # HuggingFace cache (Colab + local — model weights are huge)
 .cache/
