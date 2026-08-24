@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import textwrap
+from collections import Counter
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -39,10 +40,10 @@ def main() -> None:
     body_font = load_font(25)
     footer_font = load_font(23)
 
-    draw.text((70, 48), "NB4 · API judge verdicts", font=title_font, fill="#172238")
+    draw.text((70, 48), "NB4 · Manual rubric verdicts", font=title_font, fill="#172238")
     draw.text(
         (70, 105),
-        "Verbatim from data/eval/judge_results.json · Nguyễn Kỳ Anh · 2A202601558",
+        "Audited from the 8 saved model-output pairs · Nguyễn Kỳ Anh · 2A202601558",
         font=subtitle_font,
         fill="#555b66",
     )
@@ -72,9 +73,13 @@ def main() -> None:
         )
         card_y += 275
 
+    counts = Counter(row["winner"] for row in rows)
     draw.text(
         (900, 1055),
-        "8 prompts · 4 helpfulness + 4 safety · B wins 2 · ties 6 · A wins 0",
+        (
+            f"8 prompts · 4 helpfulness + 4 safety · "
+            f"B wins {counts['B']} · ties {counts['tie']} · A wins {counts['A']}"
+        ),
         font=footer_font,
         fill="#555b66",
         anchor="mm",

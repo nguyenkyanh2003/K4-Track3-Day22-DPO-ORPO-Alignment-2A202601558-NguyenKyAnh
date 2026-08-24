@@ -1,11 +1,11 @@
 {
   "compute_tier": "T4",
-  "base_model": "unsloth/Qwen2.5-3B-Instruct-bnb-4bit",
+  "base_model": "unsloth/Qwen2.5-3B-bnb-4bit",
   "beta": 0.1,
   "lr": 5e-07,
   "epochs": 1,
-  "final_train_loss": 2.120158515930176,
-  "end_chosen_reward": 1.0751942634582519,
-  "end_rejected_reward": 2.546736717224121,
-  "end_reward_gap": -1.4715424537658692
+  "final_train_loss": 0.6737711544036865,
+  "end_chosen_reward": -0.017693706043064594,
+  "end_rejected_reward": -0.08633071184158325,
+  "end_reward_gap": 0.06863700579851865
 }

@@ -94,6 +94,46 @@ def check_dpo_metrics(repo: Path, problems: list[str]) -> bool:
     return True
 
 
+def check_executed_colab(path: Path, problems: list[str]) -> bool:
+    """Validate that the submitted Colab notebook retained core run evidence."""
+    if not check_file(path, "executed Colab notebook", problems):
+        return False
+    try:
+        notebook = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        problems.append(f"CORRUPT  executed Colab notebook -- {exc}")
+        return False
+
+    code_cells = [cell for cell in notebook.get("cells", []) if cell.get("cell_type") == "code"]
+    unexecuted = [cell for cell in code_cells if cell.get("execution_count") is None]
+    error_outputs = [
+        output
+        for cell in code_cells
+        for output in cell.get("outputs", [])
+        if output.get("output_type") == "error"
+    ]
+    output_text = json.dumps(
+        [output for cell in code_cells for output in cell.get("outputs", [])],
+        ensure_ascii=False,
+    )
+    markers = ["SFT-mini response", "Example 1", "Example 2", "Example 3", "READY TO SUBMIT"]
+    missing_markers = [marker for marker in markers if marker not in output_text]
+
+    if unexecuted:
+        problems.append(
+            f"INCOMPLETE executed Colab notebook: {len(unexecuted)}/{len(code_cells)} code cells have no execution count"
+        )
+    if error_outputs:
+        problems.append(f"ERRORS   executed Colab notebook has {len(error_outputs)} error output(s)")
+    if missing_markers:
+        problems.append(f"MISSING  executed notebook evidence: {missing_markers}")
+    if unexecuted or error_outputs or missing_markers:
+        return False
+
+    print(f"  ✓ executed Colab notebook has {len(code_cells)}/{len(code_cells)} code cells and all core markers")
+    return True
+
+
 def check_gguf(repo: Path, problems: list[str]) -> bool:
     gguf_dir = repo / "gguf"
     if not gguf_dir.exists():
@@ -193,6 +233,8 @@ def main() -> int:
     for nb in ["01_sft_mini.py", "02_preference_data.py", "03_dpo_train.py",
                "04_compare_and_eval.py", "05_merge_deploy_gguf.py"]:
         check_file(repo / "notebooks" / nb, f"notebook {nb}", problems)
+
+    check_executed_colab(repo / "colab" / "Lab22_DPO_T4_SAFE.ipynb", problems)
 
     # Adapter outputs
     check_file(repo / "adapters" / "sft-mini" / "adapter_config.json",

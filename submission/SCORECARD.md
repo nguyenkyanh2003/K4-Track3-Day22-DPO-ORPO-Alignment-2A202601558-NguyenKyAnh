@@ -1,46 +1,41 @@
 # Provisional rubric scorecard
 
 **Sinh viên:** Nguyễn Kỳ Anh — **MSSV:** 2A202601558
-
 **Ngày audit:** 24/08/2026
 
-**Điểm ước tính nghiêm ngặt theo bằng chứng hiện có:** **77/100 core, 0 bonus**
+**Điểm ước tính nghiêm ngặt theo artifact hiện có: 100/100 core, 0/20 bonus.**
 
-Đây là tự chấm theo `rubric.md`, không phải điểm chính thức của giảng viên.
+Đây là tự chấm theo `rubric.md`, không phải điểm chính thức của giảng viên. Mọi điểm bên dưới đều có artifact hoặc output chạy thật; không dùng placeholder.
 
-| Tiêu chí core | Tối đa | Hiện tại | Bằng chứng / lý do trừ |
+| Tiêu chí core | Max | Ước tính | Bằng chứng |
 |---|---:|---:|---|
-| SFT adapter có `r=16`, `lora_alpha=32` | 6 | 6 | `adapters/sft-mini/adapter_config.json` |
-| SFT loss giảm trong một epoch | 6 | 6 | `02-sft-loss.png` có xu hướng giảm khoảng 1,97 → 1,26 |
-| Sample generation được in trong NB1 | 5 | 0 | Không có executed notebook giữ output NB1 |
-| Parquet có `prompt/chosen/rejected` | 6 | 6 | 2.000 dòng, đúng ba cột |
-| Ba ví dụ được in và `chosen != rejected` | 6 | 0 | Dữ liệu đã audit nhưng không có output cell NB2; xem `ARTIFACT_AUDIT.md` |
-| DPO adapter riêng | 6 | 6 | SFT/DPO checkpoint có SHA-256 khác nhau |
-| Reward gap tăng đúng chiều | 12 | 0 | Gap cuối `−1,4715`, rejected reward cao hơn chosen |
-| Vẽ và diễn giải cả hai reward | 10 | 10 | `03-dpo-reward-curves.png` + Reflection §3 |
-| Bảng ≥8 prompt × 2 output | 8 | 8 | `04-side-by-side-table.png` + JSONL 8 dòng |
-| Summary, 4 helpfulness + 4 safety | 7 | 7 | DPO thắng 2, hòa 6, thua 0 |
-| Tái lập bằng pipeline/Run-all | 5 | 5 | Notebook one-click + 5/5 smoke tests |
-| Reflection §3 và §6 ≥150 từ | 15 | 15 | Lần lượt khoảng 260 và 260 token tách theo whitespace |
-| §3 diễn giải chosen/rejected riêng | 5 | 5 | Có số cuối kỳ và chẩn đoán đúng failure mode |
-| `make verify` / `verify.py` exit 0 | 3 | 3 | Core gate qua, reward âm được cảnh báo non-blocking |
-| **Tổng core** | **100** | **77** | |
+| SFT config `r=16`, `lora_alpha=32` | 6 | 6 | `adapters/sft-mini/adapter_config.json` |
+| SFT loss giảm tổng thể | 6 | 6 | `submission/screenshots/02-sft-loss.png` |
+| Sample generation in trong NB1 | 5 | 5 | Executed notebook, code cell 16: `SFT-mini response` |
+| Parquet đúng ba cột | 6 | 6 | `data/pref/train.parquet`: 2.000 dòng |
+| Ba examples in trong NB2 | 6 | 6 | Executed notebook, code cell 21: Example 1–3, mỗi cặp `chosen != rejected` |
+| DPO adapter config riêng | 6 | 6 | `adapters/dpo/adapter_config.json` |
+| Reward gap tăng đúng chiều | 12 | 12 | Gap cuối `+0,0686`; plot tăng từ gần 0 |
+| Hai reward curves + diễn giải | 10 | 10 | Plot + `submission/REFLECTION.md` §3 |
+| Bảng 8 prompt × 2 output | 8 | 8 | JSONL + screenshot + executed notebook |
+| Summary 4 helpfulness + 4 safety | 7 | 7 | Manual audit: DPO 2, SFT 3, hòa 3 |
+| Tái lập bằng Run-all | 5 | 5 | 45/45 code cells đã chạy; final verify thành công |
+| Reflection §3 và §6 ≥150 từ | 15 | 15 | `submission/REFLECTION.md` |
+| §3 đọc riêng chosen/rejected | 5 | 5 | Có số liệu và chẩn đoán likelihood displacement |
+| `verify.py` exit 0 | 3 | 3 | Chạy lại sau khi cấu trúc submission |
+| **Tổng core** | **100** | **100** | |
 
-## Cách đạt 100 core
+## Bonus
 
-1. Chạy lại notebook Colab từ commit `981952a`; lần chạy mới phải dùng base/reference
-   của notebook mới và có reward gap dương. Nếu đạt, tiêu chí reward gap có thể lấy lại 12 điểm.
-2. Tải notebook `.ipynb` **sau khi chạy xong**, giữ toàn bộ output cells. NB1 phải hiện
-   ít nhất một sample generation và NB2 phải hiện ba cặp preference; hai mục này có thể lấy lại 11 điểm.
-3. Chụp thêm `01-setup-gpu.png`. Ảnh judge đã được dựng từ verdict thật thành
-   `05-judge-output.png`.
+| Add-on | Max | Hiện tại | Lý do |
+|---|---:|---:|---|
+| NB5 GGUF deploy | 6 | 0 | Không có `.gguf` hoặc smoke response |
+| NB6 benchmark | 8 | 0 | Không có benchmark JSON/plot |
+| β-sweep | 6 | 0 | Chỉ có β = 0,1 |
+| Hugging Face push | 5 | 0 | Không có Hub URL/model card |
+| GGUF multi-quant release | 3 | 0 | Không có release |
+| MMLU full | 3 | 0 | Chưa chạy NB6 |
+| W&B | 2 | 0 | Không có public run URL |
+| Cross-judge | 4 | 0 | Chỉ có manual rubric |
 
-## Bonus chưa có
-
-- NB5 GGUF + llama.cpp smoke: +6.
-- NB6 benchmark + Reflection §7 bằng số liệu thật: +8.
-- β-sweep `{0.05, 0.1, 0.5}`: +6.
-
-Ba mục trên vừa đủ chạm trần +20 nếu được chạy và phân tích đầy đủ. Ảnh
-`06-gguf-smoke.png`, `07-benchmark-comparison.png` và `bonus-beta-sweep.png` không thể
-tạo hợp lệ từ ZIP hiện tại vì không có output tương ứng.
+Bonus không thể được cấp bằng placeholder. Các mục này bắt buộc có kết quả GPU/API hoặc URL public thật.

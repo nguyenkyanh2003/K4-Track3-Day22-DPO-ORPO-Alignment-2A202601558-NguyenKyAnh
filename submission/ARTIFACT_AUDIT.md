@@ -1,38 +1,40 @@
 # Artifact audit — Lab 22
 
 **Sinh viên:** Nguyễn Kỳ Anh
-
 **MSSV:** 2A202601558
 
-**Nguồn kiểm tra:** `lab22-submission.zip`, ngày 24/08/2026
+## Sources audited
 
-## Kết quả kiểm tra tự động
+- `lab22-results.zip` — SHA-256 `37898568CE6CDD44E35CADC0052F3013C332DB0588A9F874D13427BD887C0E26`
+- Executed notebook `colab/Lab22_DPO_T4_SAFE.ipynb` — SHA-256 `A14D327474B0123F96C4499E6D6AD6CCFACE43B1B5C92A3DC68CF0E65EA393DD`
 
-| Hạng mục | Kết quả xác minh |
+## Valid artifacts
+
+| Hạng mục | Kết quả kiểm tra |
 |---|---|
-| SFT adapter | `r=16`, `lora_alpha=32`, base `unsloth/Qwen2.5-3B-Instruct-bnb-4bit` |
-| DPO adapter | Có checkpoint riêng; SHA-256 khác SFT adapter |
-| Preference data | 2.000 dòng, đúng ba cột `prompt`, `chosen`, `rejected` |
-| Chất lượng cặp preference | 0/2.000 dòng có `chosen == rejected` |
-| DPO cuối kỳ | chosen `+1.0752`, rejected `+2.5467`, gap `−1.4715`, loss `2.1202` |
-| So sánh định tính | 8 prompt: 4 helpfulness + 4 safety |
-| Judge | DPO thắng 2, hòa 6, SFT thắng 0 |
-| Đầu ra giống hệt nhau | 6/8 cặp SFT và DPO |
+| Notebook | 45/45 code cells đã chạy; 0 output kiểu `error`; final verify pass |
+| GPU | Tesla T4 14,6 GiB |
+| SFT config | `r=16`, `lora_alpha=32`, base `unsloth/Qwen2.5-3B-bnb-4bit` |
+| SFT sanity | Có prompt và response thật trong NB1 |
+| DPO config | Có tại đường dẫn riêng `adapters/dpo/adapter_config.json` |
+| DPO metrics | loss `0,6738`; chosen `−0,0177`; rejected `−0,0863`; gap `+0,0686` |
+| Preference data | 2.000 dòng; đúng `prompt/chosen/rejected`; ba examples được in trong NB2 |
+| Eval | 8 cặp output; 4 helpfulness + 4 safety |
+| Manual rubric | DPO thắng 2; SFT thắng 3; hòa 3 |
+| Screenshot | SFT loss, DPO reward curves, side-by-side, manual verdicts |
 
-SHA-256 của hai checkpoint LoRA:
+Reward plot thể hiện gap tăng từ gần 0 lên vùng dương và vẽ riêng chosen/rejected. SFT loss giảm tổng thể từ khoảng 1,56 xuống khoảng 1,13 dù có dao động mini-batch.
 
-- SFT: `BF87119A6506EED020414489E5B09B080696A487BA82EB7BA567C86F9699A3C3`
-- DPO: `1CC62D85C89E772ADD94B5D05E980DD2DE575AA9F7534D0A32E0CA5A190785B9`
+## Ba preference examples
 
-## Ba cặp preference đã kiểm tra
+Notebook đã in trực tiếp ba cặp sau và Parquet xác nhận `chosen != rejected`:
 
-1. **Prompt:** viết chương trình C++ kiểm tra một quốc gia có giáp Địa Trung Hải hay không. **Chosen:** đưa ra chương trình dùng cấu trúc dữ liệu ánh xạ quốc gia/biển. **Rejected:** dùng API/biểu thức C++ không hợp lệ. Hai câu trả lời khác nhau.
-2. **Prompt:** trình bày cách dùng GPT để tự động tạo tiêu đề và mô tả YouTube. **Chosen:** nêu tuần tự chọn model, lấy API key và xây pipeline. **Rejected:** giả định phải tự huấn luyện GPT nhưng thiếu hướng dẫn triển khai chính xác. Hai câu trả lời khác nhau.
-3. **Prompt:** phân tích các yếu tố kinh tế, chính trị và xã hội dẫn đến khủng hoảng chứng khoán 1929. **Chosen:** đi thẳng vào các yếu tố liên quan và cấu trúc bài phân tích. **Rejected:** mở đầu chung và ít bám sát yêu cầu so sánh hơn. Hai câu trả lời khác nhau.
+1. C++ kiểm tra quốc gia giáp Địa Trung Hải.
+2. Tự động tạo tiêu đề/mô tả YouTube bằng GPT.
+3. Phân tích khủng hoảng chứng khoán năm 1929.
 
-## Giới hạn của bộ artifact hiện tại
+## Warnings and scope
 
-- Không có notebook Colab **đã chạy và giữ output cells**, nên chưa có bằng chứng trực tiếp cho sample generation ở NB1 và ba ví dụ được in ở NB2.
-- Không có ảnh `01-setup-gpu.png`; tier T4 chỉ được xác nhận qua `dpo_metrics.json` và tiêu đề biểu đồ.
-- Không có GGUF, llama.cpp smoke test, benchmark hoặc beta sweep.
-- Reward gap âm cho thấy lần DPO này chưa học đúng chiều preference. Báo cáo giữ nguyên kết quả thật; không chỉnh sửa số liệu hoặc biểu đồ.
+- Các dòng `Exception ignored ... BufferError` là cảnh báo tiến trình phụ của Python 3.13/datasets; không có output notebook kiểu `error`, và các bước sau đều hoàn thành.
+- Không có `adapter_model.safetensors`; submission theo Option C/code-only, vẫn đủ core.
+- Không có GGUF, benchmark, β-sweep, Hugging Face/W&B link hoặc cross-judge; vì vậy bonus hiện là 0/20.
