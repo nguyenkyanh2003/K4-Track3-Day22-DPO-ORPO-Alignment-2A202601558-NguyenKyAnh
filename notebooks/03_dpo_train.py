@@ -70,18 +70,16 @@ assert torch.cuda.is_available(), "DPO needs a CUDA GPU. See HARDWARE-GUIDE.md."
 # ## 1. Load policy + reference (the VRAM story)
 #
 # **Critical:** DPO scores each answer under the policy (trainable) AND a frozen
-# reference. With PEFT we do **not** load a second model -- TRL toggles the LoRA
-# adapter *off* to get the reference forward pass on the same 4-bit base. The
-# extra VRAM vs SFT comes from two forward passes + holding chosen AND rejected
-# sequences, not from a second copy of the weights.
+# SFT reference. This T4-safe implementation loads two 4-bit 3B bases explicitly.
+# It uses more VRAM than adapter switching, but avoids reference/policy inversion
+# across Unsloth + TRL versions and keeps the experiment semantically correct.
 
 # %%
 from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template
 from peft import PeftModel
 
-# Load the SFT adapter twice on one shared 4-bit base: the default adapter is
-# trainable (policy), while the named reference adapter stays frozen.
+# Policy: SFT adapter remains trainable and receives the DPO updates.
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name=BASE_MODEL,
     max_seq_length=MAX_LEN,
@@ -92,18 +90,26 @@ tokenizer = get_chat_template(tokenizer, chat_template="qwen-2.5")
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
-model = PeftModel.from_pretrained(
-    model, str(SFT_PATH), adapter_name="default", is_trainable=True
-)
-model.load_adapter(str(SFT_PATH), adapter_name="reference", is_trainable=False)
-model.set_adapter("default")
-print("Policy adapter: default (trainable); reference adapter: reference (frozen)")
+model = PeftModel.from_pretrained(model, str(SFT_PATH), is_trainable=True)
+model.gradient_checkpointing_enable()
 print(f"Trainable params: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
+# Frozen reference: an independent 4-bit base with the exact same SFT adapter.
+ref_base, _ = FastLanguageModel.from_pretrained(
+    model_name=BASE_MODEL,
+    max_seq_length=MAX_LEN,
+    dtype=None,
+    load_in_4bit=True,
+)
+ref_model = PeftModel.from_pretrained(ref_base, str(SFT_PATH), is_trainable=False)
+ref_model.eval()
+for parameter in ref_model.parameters():
+    parameter.requires_grad_(False)
+print("Reference: independent frozen SFT adapter on a second 4-bit base")
+
 # %% [markdown]
-# > **Why no separate `ref_model=` argument?** TRL switches between the trainable
-# > `default` adapter and frozen `reference` adapter on the same 4-bit base. This
-# > keeps the correct SFT reference policy without duplicating base weights.
+# > **Why an explicit `ref_model=`?** It is more robust across package versions:
+# > chosen/rejected rewards are always measured against the actual SFT checkpoint.
 
 # %% [markdown]
 # ## 2. Build DPOConfig (deck §5.2 hyperparameters)
@@ -127,10 +133,10 @@ dpo_config = DPOConfig(
     optim="adamw_8bit",
     bf16=torch.cuda.is_bf16_supported(),
     fp16=not torch.cuda.is_bf16_supported(),
+    gradient_checkpointing=True,
     seed=42,
     loss_type="sigmoid",         # DPO standard (alternatives: ipo, hinge, kto)
-    model_adapter_name="default",
-    ref_adapter_name="reference",
+    force_use_ref_model=True,
     report_to="none",
 )
 
@@ -154,7 +160,7 @@ from trl import DPOTrainer
 
 trainer = DPOTrainer(
     model=model,
-    ref_model=None,                # auto-derived from PEFT base
+    ref_model=ref_model,
     args=dpo_config,
     train_dataset=pref_ds,
     processing_class=tokenizer,
@@ -258,7 +264,7 @@ if chosen_col and rejected_col and len(logs) >= 1:
 # ## 6. Save adapter
 
 # %%
-trainer.model.save_pretrained(str(DPO_OUT), selected_adapters=["default"])
+trainer.model.save_pretrained(str(DPO_OUT))
 tokenizer.save_pretrained(str(DPO_OUT))
 print(f"Saved DPO adapter to {DPO_OUT}")
 

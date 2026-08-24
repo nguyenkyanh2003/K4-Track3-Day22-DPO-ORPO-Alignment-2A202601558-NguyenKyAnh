@@ -83,6 +83,26 @@ from datasets import load_dataset
 ds = load_dataset(PREF_DATASET, split=f"train[:{PREF_SLICE}]")
 print(f"Loaded {len(ds)} pairs. Columns: {ds.column_names}")
 
+# The cleaned Argilla release exposes the scores used for binarization. Stop
+# before an expensive DPO run if a replacement dataset inverted its labels.
+# Equal-score pairs are valid in the upstream data, hence the >= comparison.
+if {"chosen-rating", "rejected-rating"}.issubset(ds.column_names):
+    import numpy as np
+
+    chosen_scores = np.asarray(ds["chosen-rating"], dtype=float)
+    rejected_scores = np.asarray(ds["rejected-rating"], dtype=float)
+    non_inverted_pct = (chosen_scores >= rejected_scores).mean() * 100
+    strictly_better_pct = (chosen_scores > rejected_scores).mean() * 100
+    print(
+        "Preference-label audit: "
+        f"chosen >= rejected for {non_inverted_pct:.1f}% of rows "
+        f"({strictly_better_pct:.1f}% strictly better)"
+    )
+    assert non_inverted_pct >= 99.0, (
+        "Preference labels appear inverted: chosen-rating should be >= "
+        "rejected-rating for almost every pair."
+    )
+
 # %% [markdown]
 # ## 3. Format with chat template
 #

@@ -50,8 +50,9 @@ def test_colab_contains_reviewed_runtime_fixes():
     required = [
         "bkai-foundation-models/vi-alpaca",
         'get_chat_template(tokenizer, chat_template="qwen-2.5")',
-        'model_adapter_name="default"',
-        'ref_adapter_name="reference"',
+        "Preference-label audit:",
+        "force_use_ref_model=True",
+        "ref_model=ref_model",
         "Loaded combined SFT+DPO adapter",
         "lab22-results.zip",
     ]

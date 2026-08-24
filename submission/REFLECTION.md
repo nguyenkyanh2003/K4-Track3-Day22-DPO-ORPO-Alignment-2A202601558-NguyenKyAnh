@@ -1,6 +1,7 @@
 # Reflection — Lab 22 (DPO/ORPO Alignment)
 
-**Tên:** _<Họ Tên>_
+**Tên:** Nguyễn Kỳ Anh
+**MSSV:** 2A202601558
 **Cohort:** _<A20-K1 / A20-K2 / ...>_
 **Tier đã chạy:** _<T4 | BIGGPU | both>_
 **Date:** _<YYYY-MM-DD>_

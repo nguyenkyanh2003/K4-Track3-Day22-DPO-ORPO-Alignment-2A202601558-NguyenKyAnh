@@ -82,6 +82,7 @@ def setup_cells(tier: str) -> list[dict]:
             "markdown",
             f"# Lab 22 — DPO/ORPO Alignment ({tier} tier)\n\n"
             f"One-click pipeline: SFT → preference data → DPO → evaluation → GGUF → benchmark.\n\n"
+            "**Sinh viên:** Nguyễn Kỳ Anh · **MSSV:** 2A202601558\n\n"
             f"**Tier:** {tier} · **Model:** {model} · generated from the reviewed Jupytext sources.\n",
         ),
         cell("markdown", "## A. Clean Colab setup\n"),

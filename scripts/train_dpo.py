@@ -61,11 +61,16 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    model = PeftModel.from_pretrained(
-        model, args.sft_path, adapter_name="default", is_trainable=True
+    model = PeftModel.from_pretrained(model, args.sft_path, is_trainable=True)
+    model.gradient_checkpointing_enable()
+
+    ref_base, _ = FastLanguageModel.from_pretrained(
+        model_name=base_model, max_seq_length=max_len, dtype=None, load_in_4bit=True,
     )
-    model.load_adapter(args.sft_path, adapter_name="reference", is_trainable=False)
-    model.set_adapter("default")
+    ref_model = PeftModel.from_pretrained(ref_base, args.sft_path, is_trainable=False)
+    ref_model.eval()
+    for parameter in ref_model.parameters():
+        parameter.requires_grad_(False)
 
     config = DPOConfig(
         output_dir=str(output.parent / f"{output.name}-checkpoints"),
@@ -83,21 +88,21 @@ def main():
         optim="adamw_8bit",
         bf16=torch.cuda.is_bf16_supported(),
         fp16=not torch.cuda.is_bf16_supported(),
+        gradient_checkpointing=True,
         seed=42,
         loss_type="sigmoid",
-        model_adapter_name="default",
-        ref_adapter_name="reference",
+        force_use_ref_model=True,
         report_to="none",
     )
 
     pref = Dataset.from_parquet(args.pref_path)
     trainer = DPOTrainer(
-        model=model, ref_model=None, args=config,
+        model=model, ref_model=ref_model, args=config,
         train_dataset=pref, processing_class=tokenizer,
     )
     train_result = trainer.train()
 
-    trainer.model.save_pretrained(str(output), selected_adapters=["default"])
+    trainer.model.save_pretrained(str(output))
     tokenizer.save_pretrained(str(output))
 
     # Headline metrics
